@@ -140,6 +140,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .chips button{padding:8px 12px;border-radius:99px;background:#EEF1F6;font-size:13px;font-weight:600;color:var(--ink-2);border:1.5px solid transparent}
 .chips button.on{background:#E7EEFB;border-color:var(--cobalt);color:var(--cobalt-d)}
 .field{margin-bottom:14px}
+/* танлов майдони (select кўринишида) */
+.selbox{width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:9px 34px 10px 13px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A889E' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;font-family:inherit}
+.selbox:active{border-color:var(--cobalt)}
+.selbox .sl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ink-3);margin-bottom:2px}
+.selbox .sv{display:block;font-size:15px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selbox .sv.ph{color:var(--ink-3);font-weight:500}
+.pick{max-height:64vh;overflow:auto;margin-top:2px}
+.pick button{display:block;width:100%;text-align:left;padding:12px 13px;border-radius:11px;font-size:14.5px;font-weight:600;color:var(--ink-2);background:#F4F6FA;border:1.5px solid transparent}
+.pick button+button{margin-top:5px}
+.pick button.on{background:#E7EEFB;border-color:var(--cobalt);color:var(--cobalt-d)}
 
 /* ——— рўйхат ——— */
 .item{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
@@ -273,16 +285,22 @@ table.grid tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bott
         <input class="inp" type="date" id="fDate">
       </div>
       <div class="field">
-        <label class="f">Ҳисоб — қаердан/қаерга</label>
-        <div class="chips" id="fAccs"></div>
+        <button type="button" class="selbox" onclick="openPick('acc')">
+          <span class="sl">Ҳисоб — қаердан/қаерга</span>
+          <span class="sv ph" id="fAccVal">Танланг</span>
+        </button>
       </div>
       <div class="field">
-        <label class="f">Категория</label>
-        <div class="chips" id="fCats"></div>
+        <button type="button" class="selbox" onclick="openPick('cat')">
+          <span class="sl">Категория</span>
+          <span class="sv ph" id="fCatVal">Танланг</span>
+        </button>
       </div>
       <div class="field" id="fMemberWrap">
-        <label class="f">Ким учун</label>
-        <div class="chips" id="fMembers"></div>
+        <button type="button" class="selbox" onclick="openPick('mem')">
+          <span class="sl">Ким учун</span>
+          <span class="sv ph" id="fMemVal">Танланг</span>
+        </button>
       </div>
       <div class="field" style="margin-bottom:0">
         <label class="f">Тавсиф (ихтиёрий)</label>
@@ -660,18 +678,42 @@ function byUse(list,key){return list.slice().sort((a,b)=>useCount(key,b)-useCoun
 function accsByUse(){return S.accounts.slice().sort((a,b)=>useCount('acc',b.id)-useCount('acc',a.id))}
 function pickCat(i){FCAT=CATS[i];renderAddForm()}
 function pickMem(i){const m=MEMS[i];FMEM=(FMEM===m?null:m);renderAddForm()}
+/* танлов майдонлари ва рўйхат варағи */
+function setSelVal(id,val,ph){const e=el(id);if(!e)return;
+  e.textContent=val||ph||'Танланг';e.className='sv'+(val?'':' ph')}
+let PICKACCS=[];
+function openPick(kind){
+  let title='',html='';
+  if(kind==='acc'){
+    if(!S.accounts.length){toast('Аввал «Ҳисоблар» бўлимида ҳисоб очинг');return}
+    PICKACCS=accsByUse();title='Ҳисоб — қаердан/қаерга';
+    html=PICKACCS.map((a,i)=>`<button class="${a.id===FACC?'on':''}" onclick="chooseAcc(${i})">${esc(a.name)}${a.cur==='USD'?' $':''}</button>`).join('');
+  }else if(kind==='cat'){
+    title='Категория';
+    html=CATS.map((c,i)=>`<button class="${c===FCAT?'on':''}" onclick="chooseCat(${i})">${esc(c)}</button>`).join('');
+  }else{
+    title='Ким учун';
+    html=`<button class="${FMEM?'':'on'}" onclick="chooseMem(-1)">Танланмаган</button>`+
+      MEMS.map((m,i)=>`<button class="${m===FMEM?'on':''}" onclick="chooseMem(${i})">${esc(m)}</button>`).join('');
+  }
+  sheet(`<div class="eyebrow">${title}</div><div class="pick">${html}</div>`);
+}
+function chooseAcc(i){const a=PICKACCS[i];if(a)FACC=a.id;closeSheet();renderAddForm()}
+function chooseCat(i){FCAT=CATS[i];closeSheet();renderAddForm()}
+function chooseMem(i){FMEM=i<0?null:MEMS[i];closeSheet();renderAddForm()}
 function renderAddForm(){
   if(!el('fDate').value) el('fDate').value=today();
   const cats=byUse(FT===EXP?S.catEx:S.catIn,'cat');
   if(!FCAT||!cats.includes(FCAT)) FCAT=cats[0];
-  if(!S.accounts.length){el('fCats').innerHTML='';el('fAccs').innerHTML='<div class="sm muted">Аввал «Ҳисоблар» бўлимида ҳисоб очинг.</div>';return}
-  if(!FACC||!acc(FACC)) FACC=S.accounts[0].id;
-  MEMS=[...S.members,S.shared];
   CATS=cats;
-  el('fCats').innerHTML=cats.map((c,i)=>`<button class="${c===FCAT?'on':''}" onclick="pickCat(${i})">${esc(c)}</button>`).join('');
-  el('fAccs').innerHTML=accsByUse().map(a=>`<button class="${a.id===FACC?'on':''}" onclick="FACC='${a.id}';renderAddForm()">${esc(a.name)}${a.cur==='USD'?' $':''}</button>`).join('');
-  el('fMembers').innerHTML=MEMS.map((m,i)=>`<button class="${m===FMEM?'on':''}" onclick="pickMem(${i})">${esc(m)}</button>`).join('');
+  MEMS=[...S.members,S.shared];
+  setSelVal('fMemVal',FMEM,'Танланмаган');
+  if(!S.accounts.length){setSelVal('fCatVal',FCAT);setSelVal('fAccVal',null,'Аввал ҳисоб очинг');return}
+  if(!FACC||!acc(FACC)) FACC=S.accounts[0].id;
   const a=acc(FACC);
+  setSelVal('fAccVal',a?a.name+(a.cur==='USD'?' $':''):null);
+  setSelVal('fCatVal',FCAT);
+  setSelVal('fMemVal',FMEM,'Танланмаган');
   el('curLbl').textContent=a&&a.cur==='USD'?'доллар':'сўм';
   updUzs();
 }
