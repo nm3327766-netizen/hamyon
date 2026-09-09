@@ -126,8 +126,9 @@ label.f{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin:0
 select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A889E' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 .amount-in{width:100%;border:0;border-bottom:2px solid var(--line);padding:6px 0 10px;font-family:'Unbounded',sans-serif;font-weight:700;font-size:30px;letter-spacing:-.03em;outline:none;background:transparent}
 .amount-in:focus{border-color:var(--cobalt)}
-.calcbar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
-.calcbar button{background:#EEF2F8;color:var(--cobalt-d);border-radius:10px;padding:11px 0;font-weight:700;font-size:17px;line-height:1;font-family:'Unbounded',sans-serif}
+.calcbar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
+.calcbar button{background:#EEF2F8;color:var(--cobalt-d);border-radius:10px;padding:12px 0;font-weight:700;font-size:17px;line-height:1;font-family:'Unbounded',sans-serif}
+.calcbar button.w2{grid-column:span 2}
 .calcbar button:active{background:#DFE7F3}
 .calcbar button.eq{background:var(--cobalt);color:#fff}
 .calcbar button.k000{font-size:13px;letter-spacing:-.02em}
@@ -252,12 +253,14 @@ table.grid tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bott
       <label class="f">Сумма (<span id="curLbl">сўм</span>)</label>
       <input class="amount-in num" id="fAmount" inputmode="decimal" placeholder="0">
       <div class="calcbar">
+        <button type="button" onclick="calcIns('(')">(</button>
+        <button type="button" onclick="calcIns(')')">)</button>
+        <button type="button" class="k000" onclick="calcIns('000')">000</button>
+        <button type="button" class="w2" onclick="calcBack()">⌫</button>
         <button type="button" onclick="calcIns('+')">+</button>
         <button type="button" onclick="calcIns('−')">−</button>
         <button type="button" onclick="calcIns('×')">×</button>
         <button type="button" onclick="calcIns('÷')">÷</button>
-        <button type="button" class="k000" onclick="calcIns('000')">000</button>
-        <button type="button" onclick="calcBack()">⌫</button>
         <button type="button" class="eq" onclick="calcEq()">=</button>
       </div>
       <div class="calcres num" id="fCalc"></div>
