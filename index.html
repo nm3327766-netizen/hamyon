@@ -198,6 +198,14 @@ table.grid tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bott
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));background:var(--ink);color:#fff;padding:10px 16px;border-radius:99px;font-size:13.5px;font-weight:600;z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.on{opacity:1}
 .empty{text-align:center;padding:22px 10px;color:var(--ink-3);font-size:13.5px}
+/* йиллик харажат */
+.yrtag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.02em;padding:1px 7px;border-radius:99px;background:#F6EBD3;color:#7A5611;margin-left:6px;vertical-align:1px}
+.ic.yr{background:#F6EBD3;color:#8A6212}
+.yrc{color:#8A6212}
+.pick .ghead{margin:14px 2px 6px}
+table.grid tr.sec td{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);padding-top:12px}
+table.grid tr.sub td{font-weight:700;background:#F6F8FB}
+table.grid tr.sub td:first-child{background:#F6F8FB}
 </style>
 </head>
 <body>
@@ -235,11 +243,13 @@ table.grid tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bott
     </div>
     <div class="grid3">
       <div><div class="sm muted">Даромад</div><div class="num pos" style="font-weight:700" id="mIn">0</div></div>
-      <div><div class="sm muted">Харажат</div><div class="num neg" style="font-weight:700" id="mOut">0</div></div>
-      <div><div class="sm muted">Қолдиқ</div><div class="num" style="font-weight:700" id="mNet">0</div></div>
+      <div><div class="sm muted">Ойлик харажат</div><div class="num neg" style="font-weight:700" id="mOut">0</div></div>
+      <div><div class="sm muted">Йиллик харажат</div><div class="num yrc" style="font-weight:700" id="mYr">0</div></div>
     </div>
     <div class="bar"><i id="mBar"></i></div>
     <div class="sm muted" style="margin-top:7px" id="mHint"></div>
+    <hr class="sep">
+    <div class="between"><span class="sm" id="mNetLbl">Қолдиқ</span><b class="num" id="mNet">0</b></div>
   </div>
 
   <div class="card">
@@ -295,6 +305,14 @@ table.grid tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bott
           <span class="sl">Категория</span>
           <span class="sv ph" id="fCatVal">Танланг</span>
         </button>
+      </div>
+      <div class="field" id="fYrWrap">
+        <label class="f">Харажат тури</label>
+        <div class="seg" id="yrSeg" style="margin-bottom:6px">
+          <button type="button" data-y="0" onclick="setYr(false)">Ойлик</button>
+          <button type="button" data-y="1" onclick="setYr(true)">Йиллик</button>
+        </div>
+        <div class="sm muted" id="fYrHint"></div>
       </div>
       <div class="field" id="fMemberWrap">
         <button type="button" class="selbox" onclick="openPick('mem')">
@@ -411,6 +429,9 @@ table.grid tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bott
 const KEY='hamyon_v1';
 const INC='Даромад', EXP='Харажат', TIN='Ўтказма кирим', TOUT='Ўтказма чиқим';
 const TCAT='Ҳисоблараро ўтказма';
+/* йиллик харажат: ёзувда yr:true. KM — ойлик, KY — йиллик */
+const KM=t=>!t.yr, KY=t=>!!t.yr;
+const YR_DEF=['Суғурта ва солиқ','Ўқиш контракти','Закот ва қурбонлик','Тўй ва маросимлар','Катта харид ва таъмир'];
 const K_MONEY='Пул', K_OWED='Менга қарздор', K_DEBT='Мен қарздорман';
 const PALETTE=['#1F4E9C','#0E7C86','#B8862A','#AE3B2C','#5B4B8A','#2E7D5B','#C2662B','#3E6FB0','#1B7A4B','#8C5A9E','#A8813F','#5E7D8C','#7A4B4B','#2D6E7E','#96A03C'];
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -513,12 +534,29 @@ async function load(){
   try{ const v=localStorage.getItem(KEY); if(v) S=JSON.parse(v) }catch(e){ S=null }
   if(!S){ try{ if(window.storage){ const r=await window.storage.get(KEY,false); if(r&&r.value) S=JSON.parse(r.value) } }catch(e){ S=null } }
   if(!S||!S.accounts){ S=seed(); doSave() }
+  if(migrate()) doSave();
+}
+/* эски маълумотни янги тузилишга мослаш. Ўзгарган бўлса true */
+function migrate(){
+  let ch=false;
   if(!S.ui) S.ui={};
   S.ui.month=S.ui.month||ym(new Date());
   S.ui.rep=S.ui.rep||'month';
   S.ui.year=S.ui.year||new Date().getFullYear();
   if(!S.nw) S.nw={estate:0,vehicles:0,business:0,other:0,loan:0,otherLiab:0,months:6};
   if(!S.plan) S.plan={};
+  if(!Array.isArray(S.catEx)) S.catEx=[];
+  if(!Array.isArray(S.catYr)){
+    S.catYr=[]; ch=true;
+    for(const c of YR_DEF){
+      if(!S.catEx.includes(c)){
+        const j=S.catEx.indexOf('Бошқа харажат');
+        if(j>=0) S.catEx.splice(j,0,c); else S.catEx.push(c);
+      }
+      S.catYr.push(c);
+    }
+  }
+  return ch;
 }
 
 /* ---------- ҳисоб-китоб ---------- */
@@ -541,9 +579,11 @@ function totals(){
   return {money,owed,debt,net:money+owed-debt};
 }
 function inRange(t,f,to){return (!f||t.date>=f)&&(!to||t.date<=to)}
-function sumBy(type,f,to,key){
+function isYrCat(c){return (S.catYr||[]).includes(c)}
+function sumBy(type,f,to,key,flt){
   const m=new Map();
   for(const t of S.txns){ if(t.type!==type||!inRange(t,f,to))continue;
+    if(flt&&!flt(t))continue;
     const k=(key==='cat'?t.cat:t.member)||'';
     m.set(k,(m.get(k)||0)+txnUZS(t)); }
   return m;
@@ -558,12 +598,23 @@ function familyStats(f,to){
   const total=rows.reduce((s,r)=>s+r.total,0);
   return {rows,sharedSum,unassigned,total};
 }
-function monthlyAvgExpense(year){
-  let sum=0,months=new Set();
+/* харажат йиғиндиси: kind 'm' — ойлик, 'y' — йиллик, йўқ — ҳаммаси */
+function expOf(f,to,kind){
+  let s=0;
+  for(const t of S.txns){ if(t.type!==EXP||!inRange(t,f,to))continue;
+    if(kind==='m'&&t.yr)continue; if(kind==='y'&&!t.yr)continue;
+    s+=txnUZS(t); }
+  return s;
+}
+/* йил бўйича: ойлик харажат ўртачаси + йиллик харажатнинг 1/12 улуши */
+function expStats(year){
+  let reg=0,yr=0; const months=new Set();
   for(const t of S.txns){ if(t.type!==EXP)continue;
     if(String(t.date).slice(0,4)!==String(year))continue;
-    sum+=txnUZS(t); months.add(t.date.slice(0,7)); }
-  return months.size? sum/months.size : 0;
+    const v=txnUZS(t);
+    if(t.yr) yr+=v; else { reg+=v; months.add(t.date.slice(0,7)); } }
+  const regAvg=months.size? reg/months.size : 0;
+  return {reg,regAvg,yr,yrMonth:yr/12,need:regAvg+yr/12};
 }
 </script>
 <script>
@@ -599,16 +650,20 @@ function renderHome(){
   const m=S.ui.month, f=monthStart(m), t=monthEnd(m);
   const sel=el('homeMonth'); const opts=monthOptions();
   sel.innerHTML=opts.map(o=>`<option value="${o}"${o===m?' selected':''}>${monthLabel(o)}</option>`).join('');
-  const inc=totalOf(INC,f,t), exp=totalOf(EXP,f,t);
+  const inc=totalOf(INC,f,t), exp=expOf(f,t,'m'), yr=expOf(f,t,'y');
+  const net=inc-exp-yr;
   el('mIn').textContent='+'+fmt(inc); el('mOut').textContent='−'+fmt(exp);
-  el('mNet').textContent=fmt(inc-exp);
-  el('mNet').className='num '+(inc-exp>=0?'pos':'neg');
+  el('mYr').textContent=yr?'−'+fmt(yr):'0';
+  el('mNet').textContent=fmt(net);
+  el('mNet').className='num '+(net>=0?'pos':'neg');
+  el('mNetLbl').textContent=yr?'Қолдиқ (йиллик харажат ҳам айрилган)':'Қолдиқ';
+  /* назорат чизиғи — фақат ойлик харажат бўйича */
   const ratio=inc>0?Math.min(1,exp/inc):(exp>0?1:0);
   el('mBar').style.width=(ratio*100)+'%';
   el('mBar').style.background=ratio>0.9?'var(--clay)':(ratio>0.7?'var(--brass)':'var(--teal)');
   el('mHint').textContent = inc>0
-    ? 'Даромаднинг '+pct(exp/inc)+' и сарфланди · жамғарма улуши '+pct(Math.max(0,(inc-exp)/inc))
-    : (exp>0?'Бу ойда даромад ёзилмаган.':'Бу ойда ҳали ёзув йўқ.');
+    ? 'Ойлик харажат — даромаднинг '+pct(exp/inc)+' и · жамғарма улуши '+pct(Math.max(0,net/inc))
+    : (exp+yr>0?'Бу ойда даромад ёзилмаган.':'Бу ойда ҳали ёзув йўқ.');
   el('lastList').innerHTML=txnList(S.txns.slice().sort(byDate).slice(0,7));
 }
 const ACOL=[['#8FD3E8','#2E7D9B'],['#F2CE7E','#B8862A'],['#A9E3C8','#1B7A4B'],['#C9B7E8','#5B4B8A'],['#F3A8A0','#AE3B2C'],['#9FD6B4','#2D6E7E']];
@@ -632,14 +687,15 @@ function txnList(arr){
   if(!arr.length) return '<div class="empty">Ҳозирча ёзув йўқ. «Ёзув» бўлимидан бошланг.</div>';
   return arr.map(t=>{
     const a=acc(t.acc); const isOut=(t.type===EXP||t.type===TOUT);
-    const cls=t.type===EXP?'exp':(t.type===INC?'inc':'trf');
+    const yr=t.type===EXP&&t.yr;
+    const cls=t.type===EXP?(yr?'yr':'exp'):(t.type===INC?'inc':'trf');
     const ico=t.type===EXP?'−':(t.type===INC?'+':'⇄');
     const uzs=txnUZS(t);
     const amt=(isOut?'−':'+')+fmt(uzs);
     const sub=[a?a.name:'?',t.member,t.desc].filter(Boolean).join(' · ');
     return `<div class="item" onclick="openTxn('${t.id}')">
       <div class="av ic ${cls}">${ico}</div>
-      <div class="tx"><div class="t1">${esc(t.cat||t.type)}</div><div class="t2">${esc(t.date)} · ${esc(sub)}</div></div>
+      <div class="tx"><div class="t1">${esc(t.cat||t.type)}${yr?'<span class="yrtag">йиллик</span>':''}</div><div class="t2">${esc(t.date)} · ${esc(sub)}</div></div>
       <div class="amt num ${isOut?'neg':'pos'}">${amt}</div></div>`;
   }).join('');
 }
@@ -649,14 +705,16 @@ function renderJour(){
   if(!el('jFrom').value){el('jFrom').value=monthStart(S.ui.month);el('jTo').value=monthEnd(S.ui.month)}
   const f=el('jFrom').value,t=el('jTo').value,q=(el('jQ').value||'').toLowerCase();
   let arr=S.txns.filter(x=>inRange(x,f,t));
-  if(q) arr=arr.filter(x=>[x.cat,x.member,x.desc,(acc(x.acc)||{}).name].join(' ').toLowerCase().includes(q));
+  if(q) arr=arr.filter(x=>[x.cat,x.member,x.desc,(acc(x.acc)||{}).name,(x.type===EXP&&x.yr?'йиллик':'')].join(' ').toLowerCase().includes(q));
   arr.sort(byDate);
   const inc=arr.filter(x=>x.type===INC).reduce((s,x)=>s+txnUZS(x),0);
   const exp=arr.filter(x=>x.type===EXP).reduce((s,x)=>s+txnUZS(x),0);
+  const yr=arr.filter(x=>x.type===EXP&&x.yr).reduce((s,x)=>s+txnUZS(x),0);
   el('jourList').innerHTML=
-    `<div class="between sm" style="padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:4px">
-      <span class="muted">${arr.length} та ёзув</span>
-      <span><b class="pos num">+${fmt(inc)}</b> &nbsp; <b class="neg num">−${fmt(exp)}</b></span></div>`+txnList(arr);
+    `<div style="padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:4px">
+      <div class="between sm"><span class="muted">${arr.length} та ёзув</span>
+      <span><b class="pos num">+${fmt(inc)}</b> &nbsp; <b class="neg num">−${fmt(exp)}</b></span></div>
+      ${yr?`<div class="sm muted" style="text-align:right;margin-top:3px">ойлик −${fmt(exp-yr)} · <span class="yrc">йиллик −${fmt(yr)}</span></div>`:''}</div>`+txnList(arr);
 }
 
 /* ---------- ЁЗУВ ---------- */
@@ -667,16 +725,24 @@ function setType(t){
   el('formSimple').style.display=t==='transfer'?'none':'block';
   el('formTransfer').style.display=t==='transfer'?'block':'none';
   el('fMemberWrap').style.display=t===EXP?'block':'none';
+  el('fYrWrap').style.display=t===EXP?'block':'none';
   if(t!=='transfer'){ FCAT=null; renderAddForm(); }
   else renderTransferForm();
 }
-function openAdd(t){go('add');setType(t==='transfer'?'transfer':t)}
-let FCAT=null,FACC=null,FMEM=null,MEMS=[];
+function openAdd(t){if(EDIT)resetForm();go('add');setType(t==='transfer'?'transfer':t)}
+let FCAT=null,FACC=null,FMEM=null,MEMS=[],FYR=false;
 let CATS=[];
+function setYr(v){FYR=!!v;renderYrSeg()}
+function renderYrSeg(){
+  document.querySelectorAll('#yrSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.y==='1')===FYR));
+  el('fYrHint').textContent=FYR
+    ?'Йилда бир марта бўладиган харажат. Ойлик назоратга кирмайди — алоҳида ҳисобланади.'
+    :'Ҳар ой такрорланадиган одатий харажат.';
+}
 function useCount(key,val){let n=0;for(const t of S.txns)if(t[key]===val)n++;return n}
 function byUse(list,key){return list.slice().sort((a,b)=>useCount(key,b)-useCount(key,a))}
 function accsByUse(){return S.accounts.slice().sort((a,b)=>useCount('acc',b.id)-useCount('acc',a.id))}
-function pickCat(i){FCAT=CATS[i];renderAddForm()}
+function pickCat(i){FCAT=CATS[i];if(!EDIT)FYR=isYrCat(FCAT);renderAddForm()}
 function pickMem(i){const m=MEMS[i];FMEM=(FMEM===m?null:m);renderAddForm()}
 /* танлов майдонлари ва рўйхат варағи */
 function setSelVal(id,val,ph){const e=el(id);if(!e)return;
@@ -690,7 +756,12 @@ function openPick(kind){
     html=PICKACCS.map((a,i)=>`<button class="${a.id===FACC?'on':''}" onclick="chooseAcc(${i})">${esc(a.name)}${a.cur==='USD'?' $':''}</button>`).join('');
   }else if(kind==='cat'){
     title='Категория';
-    html=CATS.map((c,i)=>`<button class="${c===FCAT?'on':''}" onclick="chooseCat(${i})">${esc(c)}</button>`).join('');
+    const btn=([c,i])=>`<button class="${c===FCAT?'on':''}" onclick="chooseCat(${i})">${esc(c)}</button>`;
+    const all=CATS.map((c,i)=>[c,i]);
+    if(FT===EXP){
+      const reg=all.filter(([c])=>!isYrCat(c)), yrs=all.filter(([c])=>isYrCat(c));
+      html=reg.map(btn).join('')+(yrs.length?'<div class="ghead">Йиллик харажатлар</div>'+yrs.map(btn).join(''):'');
+    } else html=all.map(btn).join('');
   }else{
     title='Ким учун';
     html=`<button class="${FMEM?'':'on'}" onclick="chooseMem(-1)">Танланмаган</button>`+
@@ -699,14 +770,15 @@ function openPick(kind){
   sheet(`<div class="eyebrow">${title}</div><div class="pick">${html}</div>`);
 }
 function chooseAcc(i){const a=PICKACCS[i];if(a)FACC=a.id;closeSheet();renderAddForm()}
-function chooseCat(i){FCAT=CATS[i];closeSheet();renderAddForm()}
+function chooseCat(i){FCAT=CATS[i];if(!EDIT)FYR=isYrCat(FCAT);closeSheet();renderAddForm()}
 function chooseMem(i){FMEM=i<0?null:MEMS[i];closeSheet();renderAddForm()}
 function renderAddForm(){
   if(!el('fDate').value) el('fDate').value=today();
   const cats=byUse(FT===EXP?S.catEx:S.catIn,'cat');
-  if(!FCAT||!cats.includes(FCAT)) FCAT=cats[0];
+  if(!FCAT||!cats.includes(FCAT)){ FCAT=cats[0]; if(!EDIT) FYR=isYrCat(FCAT); }
   CATS=cats;
   MEMS=[...S.members,S.shared];
+  renderYrSeg();
   setSelVal('fMemVal',FMEM,'Танланмаган');
   if(!S.accounts.length){setSelVal('fCatVal',FCAT);setSelVal('fAccVal',null,'Аввал ҳисоб очинг');return}
   if(!FACC||!acc(FACC)) FACC=S.accounts[0].id;
@@ -747,6 +819,7 @@ function updUzs(){
 }
 function resetForm(){
   EDIT=null; el('fAmount').value=''; el('fDesc').value=''; el('fDate').value=today();
+  FYR=isYrCat(FCAT);
   el('saveBtn').textContent='Сақлаш'; el('cancelEdit').style.display='none'; renderAddForm(); updUzs();
 }
 function saveSimple(){
@@ -756,8 +829,9 @@ function saveSimple(){
   const rec={id:EDIT||uid(),date:el('fDate').value||today(),type:FT,cat:FCAT,
     member:FT===EXP?(FMEM||''):'',desc:el('fDesc').value.trim(),acc:FACC,amount:v,
     rate:a.cur==='USD'?S.rate:1};
+  if(FT===EXP&&FYR) rec.yr=true;
   if(EDIT){const i=S.txns.findIndex(x=>x.id===EDIT); S.txns[i]=rec; toast('Ўзгартирилди')}
-  else {S.txns.push(rec); toast('Сақланди: '+fmt(v*(a.cur==='USD'?S.rate:1))+' сўм')}
+  else {S.txns.push(rec); toast((rec.yr?'Йиллик харажат: ':'Сақланди: ')+fmt(v*(a.cur==='USD'?S.rate:1))+' сўм')}
   save(); resetForm(); render();
 }
 /* ўтказма */
@@ -812,23 +886,31 @@ function saveTransfer(){
 /* таҳрир варағи */
 function openTxn(id){
   const t=S.txns.find(x=>x.id===id); if(!t)return;
-  const a=acc(t.acc);
-  sheet(`<div class="eyebrow">${esc(t.type)}</div>
+  const a=acc(t.acc), isE=t.type===EXP;
+  sheet(`<div class="eyebrow">${esc(t.type)}${isE&&t.yr?' · йиллик':''}</div>
     <div class="disp" style="font-size:24px;font-weight:700;margin-bottom:2px">${fmt(txnUZS(t))} сўм</div>
     <div class="sm muted" style="margin-bottom:14px">${esc(t.date)} · ${esc(a?a.name:'?')}${a&&a.cur==='USD'?' · '+fmt2(t.amount)+' $':''}</div>
     <div class="sm" style="margin-bottom:4px"><b>Категория:</b> ${esc(t.cat||'—')}</div>
+    ${isE?`<div class="sm" style="margin-bottom:4px"><b>Харажат тури:</b> ${t.yr?'<span class="yrc">Йиллик</span> — ойлик назоратга кирмайди':'Ойлик'}</div>`:''}
     ${t.member?`<div class="sm" style="margin-bottom:4px"><b>Ким учун:</b> ${esc(t.member)}</div>`:''}
     ${t.desc?`<div class="sm" style="margin-bottom:4px"><b>Тавсиф:</b> ${esc(t.desc)}</div>`:''}
     <div style="height:14px"></div>
+    ${isE?`<button class="btn ghost" onclick="toggleYr('${id}')">${t.yr?'Ойлик харажатга қайтариш':'Йиллик харажат деб белгилаш'}</button><div style="height:8px"></div>`:''}
     ${t.type===EXP||t.type===INC?`<button class="btn ghost" onclick="editTxn('${id}')">Таҳрирлаш</button><div style="height:8px"></div>`:''}
     <button class="btn warn" onclick="delTxn('${id}')">Ўчириш</button>`);
 }
 function editTxn(id){
   const t=S.txns.find(x=>x.id===id); closeSheet(); go('add'); setType(t.type);
-  EDIT=id; FCAT=t.cat; FACC=t.acc; FMEM=t.member||null;
+  EDIT=id; FCAT=t.cat; FACC=t.acc; FMEM=t.member||null; FYR=!!t.yr;
   el('fAmount').value=t.amount; el('fDesc').value=t.desc||''; el('fDate').value=t.date;
   el('saveBtn').textContent='Ўзгартиришни сақлаш'; el('cancelEdit').style.display='block';
   renderAddForm();
+}
+function toggleYr(id){
+  const t=S.txns.find(x=>x.id===id); if(!t||t.type!==EXP)return;
+  if(t.yr) delete t.yr; else t.yr=true;
+  save(); closeSheet(); render();
+  toast(t.yr?'Йиллик харажат деб белгиланди':'Ойлик харажатга қайтарилди');
 }
 function delTxn(id){
   const t=S.txns.find(x=>x.id===id);
@@ -855,15 +937,25 @@ function monthSelector(){
     ${monthOptions().map(o=>`<option value="${o}"${o===S.ui.month?' selected':''}>${monthLabel(o)}</option>`).join('')}</select>`;
 }
 function repMonth(){
-  const m=S.ui.month,f=monthStart(m),t=monthEnd(m);
+  const m=S.ui.month,f=monthStart(m),t=monthEnd(m),y=m.slice(0,4);
   const plan=S.plan[m]||{};
-  const fi=sumBy(INC,f,t,'cat'), fe=sumBy(EXP,f,t,'cat');
+  const fi=sumBy(INC,f,t,'cat'), fe=sumBy(EXP,f,t,'cat',KM);
   const rowsIn=S.catIn.map((c,i)=>({c,i,p:plan[c]||0,a:fi.get(c)||0}));
-  const rowsEx=S.catEx.map((c,i)=>({c,i,p:plan[c]||0,a:fe.get(c)||0}));
+  const rowsEx=S.catEx.map((c,i)=>({c,i,p:plan[c]||0,a:fe.get(c)||0,y:isYrCat(c)}));
   const pIn=rowsIn.reduce((s,r)=>s+r.p,0), aIn=rowsIn.reduce((s,r)=>s+r.a,0);
   const pEx=rowsEx.reduce((s,r)=>s+r.p,0), aEx=rowsEx.reduce((s,r)=>s+r.a,0);
   const showAll=!!S.ui.showAllCats;
   const vis=r=>showAll||r.p>0||r.a>0;
+  const visEx=r=>r.p>0||r.a>0||(showAll&&!r.y);
+  /* йиллик харажатлар — алоҳида */
+  const yrTx=S.txns.filter(x=>x.type===EXP&&x.yr&&inRange(x,f,t)).sort(byDate);
+  const yrM=yrTx.reduce((s,x)=>s+txnUZS(x),0);
+  const yrY=expOf(y+'-01-01',y+'-12-31','y');
+  const savCat=sumBy(EXP,f,t,'cat').get('Жамғарма ва инвестиция')||0;
+  const net=aIn-aEx-yrM;
+  const yrList=yrTx.map(x=>`<div class="arow" onclick="openTxn('${x.id}')"><i style="background:var(--brass)"></i>
+      <div class="an"><b>${esc(x.cat)}</b><span>${esc(x.date)}${x.desc?' · '+esc(x.desc):''}</span></div>
+      <div class="av2 num">${fmt(txnUZS(x))}</div></div>`).join('');
   const line=(r,isEx)=>{
     const diff=isEx? r.p-r.a : r.a-r.p;
     return `<tr><td>${esc(r.c)}</td>
@@ -871,7 +963,7 @@ function repMonth(){
       <td class="num">${r.a?fmt(r.a):'—'}</td>
       <td class="num" style="color:${r.p?(diff>=0?'var(--teal)':'var(--clay)'):'var(--ink-3)'}">${r.p?fmt(diff):'—'}</td></tr>`;
   };
-  const savings=aIn>0?((fe.get('Жамғарма ва инвестиция')||0)+(aIn-aEx))/aIn:0;
+  const savings=aIn>0?(savCat+net)/aIn:0;
   return `<div class="card">${monthSelector()}</div>
   <div class="card">
     <div class="eyebrow">Даромад — режа / факт</div>
@@ -880,15 +972,25 @@ function repMonth(){
     <tr class="tot"><td>Жами</td><td class="num">${fmt(pIn)}</td><td class="num">${fmt(aIn)}</td><td class="num">${fmt(aIn-pIn)}</td></tr></tbody></table></div>
   </div>
   <div class="card">
-    <div class="eyebrow">Харажат — режа / факт</div>
+    <div class="eyebrow">Ойлик харажатлар — режа / факт</div>
     <div class="scrollx"><table class="grid"><thead><tr><th>Категория</th><th>Режа</th><th>Факт</th><th>Фарқ</th></tr></thead>
-    <tbody>${(rowsEx.filter(vis).length?rowsEx.filter(vis):rowsEx.slice(0,1)).map(r=>line(r,true)).join('')}
+    <tbody>${(rowsEx.filter(visEx).length?rowsEx.filter(visEx):rowsEx.filter(r=>!r.y).slice(0,1)).map(r=>line(r,true)).join('')}
     <tr class="tot"><td>Жами</td><td class="num">${fmt(pEx)}</td><td class="num">${fmt(aEx)}</td><td class="num">${fmt(pEx-aEx)}</td></tr></tbody></table></div>
-    <div class="sm muted" style="margin-top:8px">Фарқ мусбат бўлса — тежадингиз, манфий бўлса — режадан ошиб кетган.</div>
+    <div class="sm muted" style="margin-top:8px">Фақат ойлик харажатлар. Фарқ мусбат бўлса — тежадингиз, манфий бўлса — режадан ошиб кетган.</div>
     <button class="btn ghost sm" style="width:100%;margin-top:10px" onclick="S.ui.showAllCats=!S.ui.showAllCats;save();render()">${showAll?'Фақат ишлатилганлари':'Барча категорияларни кўрсатиш'}</button>
   </div>
   <div class="card">
-    <div class="between"><span>Қолдиқ (даромад − харажат)</span><b class="num ${aIn-aEx>=0?'pos':'neg'}">${fmt(aIn-aEx)}</b></div>
+    <div class="between" style="margin-bottom:4px"><div class="eyebrow" style="margin:0">Йиллик харажатлар</div><b class="num yrc">${yrM?'−'+fmt(yrM):'0'}</b></div>
+    ${yrList||'<div class="sm muted" style="padding:6px 0">Бу ойда йиллик харажат йўқ.</div>'}
+    <hr class="sep">
+    <div class="between sm" style="padding:3px 0"><span>${y}-йил жами йиллик харажат</span><b class="num">${fmt(yrY)}</b></div>
+    <div class="between sm" style="padding:3px 0"><span>Ойига тақсимланса (÷12)</span><b class="num">${fmt(yrY/12)}</b></div>
+    <div class="sm muted" style="margin-top:7px">Бу харажатлар ойлик назоратга кирмайди. Ҳар ой шу улушни четга қўйиб борсангиз, йиллик тўлов келганда ой бюджети бузилмайди.</div>
+  </div>
+  <div class="card">
+    <div class="between"><span>Қолдиқ (даромад − ойлик харажат)</span><b class="num ${aIn-aEx>=0?'pos':'neg'}">${fmt(aIn-aEx)}</b></div>
+    ${yrM?`<div class="between sm" style="margin-top:6px"><span class="muted">Йиллик харажат</span><b class="num yrc">−${fmt(yrM)}</b></div>
+    <div class="between" style="margin-top:6px"><b>Якуний қолдиқ</b><b class="num ${net>=0?'pos':'neg'}">${fmt(net)}</b></div>`:''}
     <hr class="sep">
     <div class="between"><span>Жамғарма улуши</span><b class="num" style="color:${savings>=0.2?'var(--teal)':'var(--brass)'}">${aIn>0?pct(savings):'—'}</b></div>
     <div class="bar"><i style="width:${Math.max(0,Math.min(100,savings*100))}%;background:${savings>=0.2?'var(--teal)':'var(--brass)'}"></i></div>
@@ -901,33 +1003,50 @@ function setPlan(isEx,i,v){const c=(isEx?S.catEx:S.catIn)[i]; const m=S.ui.month
 function repYear(){
   const y=S.ui.year;
   const years=[...new Set(S.txns.map(t=>+t.date.slice(0,4)))]; if(!years.includes(y))years.push(y); years.sort();
-  const mk=i=>y+'-'+String(i+1).padStart(2,'0');
-  const cell=(type,cat,i)=>{const m=mk(i);let s=0;
-    for(const t of S.txns) if(t.type===type&&t.cat===cat&&t.date.slice(0,7)===m) s+=txnUZS(t); return s};
-  const rowsFor=(type,cats)=>cats.map(c=>{
-    const v=Array.from({length:12},(_,i)=>cell(type,c,i)); const tot=v.reduce((a,b)=>a+b,0);
-    return tot?`<tr><td>${esc(c)}</td>${v.map(x=>`<td class="num">${x?fmt(x):''}</td>`).join('')}<td class="num"><b>${fmt(tot)}</b></td></tr>`:'';
-  }).join('');
-  const totRow=(type,cats,label)=>{
-    const v=Array.from({length:12},(_,i)=>cats.reduce((s,c)=>s+cell(type,c,i),0));
-    return {v,html:`<tr class="tot"><td>${label}</td>${v.map(x=>`<td class="num">${x?fmt(x):''}</td>`).join('')}<td class="num">${fmt(v.reduce((a,b)=>a+b,0))}</td></tr>`};
-  };
-  const ti=totRow(INC,S.catIn,'Даромад жами'), te=totRow(EXP,S.catEx,'Харажат жами');
-  const bal=ti.v.map((x,i)=>x-te.v[i]);
+  /* бир марта ўтиб, категория × ой жадвалини йиғамиз: i — даромад, m — ойлик, y — йиллик харажат */
+  const ys=String(y), agg={i:new Map(),m:new Map(),y:new Map()};
+  for(const t of S.txns){
+    if(String(t.date).slice(0,4)!==ys) continue;
+    const g=t.type===INC?'i':(t.type===EXP?(t.yr?'y':'m'):null); if(!g) continue;
+    const k=t.cat||'—'; if(!agg[g].has(k)) agg[g].set(k,Array(12).fill(0));
+    agg[g].get(k)[+t.date.slice(5,7)-1]+=txnUZS(t);
+  }
+  const order=(g,cats)=>[...cats.filter(c=>agg[g].has(c)),...[...agg[g].keys()].filter(k=>!cats.includes(k))];
+  const sumA=v=>v.reduce((a,b)=>a+b,0);
+  const tds=v=>v.map(x=>`<td class="num">${x?fmt(x):''}</td>`).join('');
+  const rows=(g,cats)=>order(g,cats).map(c=>{const v=agg[g].get(c);
+    return `<tr><td>${esc(c)}</td>${tds(v)}<td class="num"><b>${fmt(sumA(v))}</b></td></tr>`}).join('');
+  const colSum=g=>{const v=Array(12).fill(0);for(const a of agg[g].values())a.forEach((x,i)=>v[i]+=x);return v};
+  const totTr=(cls,label,v)=>`<tr class="${cls}"><td>${label}</td>${tds(v)}<td class="num">${fmt(sumA(v))}</td></tr>`;
+  const secTr=label=>`<tr class="sec"><td>${label}</td><td colspan="13"></td></tr>`;
+  const none='<tr><td class="muted">Ёзув йўқ</td><td colspan="13"></td></tr>';
+  const vi=colSum('i'), vm=colSum('m'), vy=colSum('y');
+  const ve=vm.map((x,i)=>x+vy[i]);
+  const bal=vi.map((x,i)=>x-ve[i]);
   const head=`<tr><th>Категория</th>${MONTHS.map(m=>`<th>${m.slice(0,3)}</th>`).join('')}<th>Жами</th></tr>`;
-  const avg=monthlyAvgExpense(y);
+  const st=expStats(y);
+  const ln=(l,v,b)=>`<div class="between sm" style="padding:6px 0;border-bottom:1px solid var(--line)"><span>${l}</span><b class="num${b?' '+b:''}">${fmt(v)}</b></div>`;
   return `<div class="card"><label class="f">Йил</label>
     <select class="inp" onchange="S.ui.year=+this.value;save();render()">${years.map(v=>`<option${v===y?' selected':''}>${v}</option>`).join('')}</select></div>
-  <div class="card"><div class="eyebrow">Даромад</div><div class="scrollx"><table class="grid"><thead>${head}</thead><tbody>${rowsFor(INC,S.catIn)||'<tr><td class="muted">Ёзув йўқ</td></tr>'}${ti.html}</tbody></table></div></div>
-  <div class="card"><div class="eyebrow">Харажат</div><div class="scrollx"><table class="grid"><thead>${head}</thead><tbody>${rowsFor(EXP,S.catEx)||'<tr><td class="muted">Ёзув йўқ</td></tr>'}${te.html}
-    <tr class="tot"><td>Қолдиқ</td>${bal.map(x=>`<td class="num" style="color:${x<0?'var(--clay)':'var(--teal)'}">${x?fmt(x):''}</td>`).join('')}<td class="num">${fmt(bal.reduce((a,b)=>a+b,0))}</td></tr></tbody></table></div></div>
-  <div class="card between"><span>Ойлик ўртача харажат</span><b class="num">${fmt(avg)}</b></div>`;
+  <div class="card"><div class="eyebrow">Даромад</div><div class="scrollx"><table class="grid"><thead>${head}</thead><tbody>${rows('i',S.catIn)||none}${totTr('tot','Даромад жами',vi)}</tbody></table></div></div>
+  <div class="card"><div class="eyebrow">Харажат</div><div class="scrollx"><table class="grid"><thead>${head}</thead><tbody>
+    ${secTr('Ойлик')}${rows('m',S.catEx)||none}${totTr('sub','Ойлик жами',vm)}
+    ${secTr('Йиллик')}${rows('y',S.catEx)||none}${totTr('sub','Йиллик жами',vy)}
+    ${totTr('tot','Харажат жами',ve)}
+    <tr class="tot"><td>Қолдиқ</td>${bal.map(x=>`<td class="num" style="color:${x<0?'var(--clay)':'var(--teal)'}">${x?fmt(x):''}</td>`).join('')}<td class="num">${fmt(sumA(bal))}</td></tr></tbody></table></div></div>
+  <div class="card"><div class="eyebrow">Ойлик эҳтиёж</div>
+    ${ln('Ойлик харажат — ойига ўртача',st.regAvg)}
+    ${ln('Йиллик харажатлар жами',st.yr,'yrc')}
+    ${ln('Йиллик харажат ойига (÷12)',st.yrMonth,'yrc')}
+    <div class="between" style="padding:9px 0 0"><b>Ҳақиқий ойлик эҳтиёж</b><b class="num disp" style="font-size:17px">${fmt(st.need)}</b></div>
+    <div class="sm muted" style="margin-top:7px">Ойлик бюджетни шу рақамга қараб режалаштиринг: одатий харажат + йиллик тўловлар учун ҳар ой четга қўйиладиган улуш.</div></div>`;
 }
 
 function repAnal(){
   if(!S.ui.from){S.ui.from=monthStart(S.ui.month);S.ui.to=monthEnd(S.ui.month)}
   const f=S.ui.from,t=S.ui.to;
-  const m=sumBy(EXP,f,t,'cat');
+  const k=S.ui.anKind||'all';
+  const m=sumBy(EXP,f,t,'cat',anFilter());
   const rows=[...m.entries()].filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const tot=rows.reduce((s,r)=>s+r[1],0);
   const list=rows.map(([c,v],i)=>`<div style="margin-bottom:10px">
@@ -941,13 +1060,19 @@ function repAnal(){
         <button class="btn sm ghost" onclick="setPeriod('m')">Шу ой</button>
         <button class="btn sm ghost" onclick="setPeriod('3')">3 ой</button>
         <button class="btn sm ghost" onclick="setPeriod('y')">Йил</button>
-        <button class="btn sm ghost" onclick="setPeriod('all')">Ҳаммаси</button></div></div>
-    <div class="card"><div class="eyebrow">Даврдаги жами харажат</div>
+        <button class="btn sm ghost" onclick="setPeriod('all')">Ҳаммаси</button></div>
+      <div class="seg" style="margin:12px 0 0">
+        <button class="${k==='all'?'on':''}" onclick="setAnKind('all')">Ҳаммаси</button>
+        <button class="${k==='m'?'on':''}" onclick="setAnKind('m')">Ойлик</button>
+        <button class="${k==='y'?'on':''}" onclick="setAnKind('y')">Йиллик</button></div></div>
+    <div class="card"><div class="eyebrow">${{all:'Даврдаги жами харажат',m:'Даврдаги ойлик харажат',y:'Даврдаги йиллик харажат'}[k]}</div>
       <div class="disp" style="font-size:26px;font-weight:700">${fmt(tot)} <span style="font-size:14px;font-family:'Golos Text'" class="muted">сўм</span></div>
       <div id="mosaic" style="height:230px;margin-top:12px"></div>
       <div class="sm muted" style="margin-top:8px">Ҳар бир катакча — харажат тури. Катаклик — улуш.</div></div>
     <div class="card"><div class="eyebrow">Харажат турлари</div>${rows.length?list:'<div class="empty">Бу даврда харажат ёзилмаган.</div>'}</div>`;
 }
+function anFilter(){const k=S.ui.anKind||'all';return k==='m'?KM:(k==='y'?KY:null)}
+function setAnKind(k){S.ui.anKind=k;save();render()}
 function setPeriod(k){
   const d=new Date();
   if(k==='m'){S.ui.from=monthStart(S.ui.month);S.ui.to=monthEnd(S.ui.month)}
@@ -979,7 +1104,7 @@ function treemap(data,W,H){
 function drawMosaic(){
   const box=el('mosaic'); if(!box)return;
   const W=box.clientWidth||340,H=box.clientHeight||230;
-  const m=sumBy(EXP,S.ui.from,S.ui.to,'cat');
+  const m=sumBy(EXP,S.ui.from,S.ui.to,'cat',anFilter());
   let rows=[...m.entries()].filter(([,v])=>v>0).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
   if(!rows.length){box.innerHTML='<div class="empty">Маълумот йўқ</div>';return}
   if(rows.length>12){const rest=rows.slice(12).reduce((s,r)=>s+r.value,0);rows=rows.slice(0,12);rows.push({name:'Бошқалар',value:rest})}
@@ -1077,7 +1202,7 @@ function renderNW(){
   const T=totals(),n=S.nw;
   const assets=T.money+T.owed+n.estate+n.vehicles+n.business+n.other;
   const liab=T.debt+n.loan+n.otherLiab;
-  const avg=monthlyAvgExpense(new Date().getFullYear());
+  const avg=expStats(new Date().getFullYear()).need;
   const need=avg*(n.months||6), have=T.money;
   const done=need>0?have/need:0;
   const inp=(k,label)=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><span class="sm">${label}</span>
@@ -1096,7 +1221,7 @@ function renderNW(){
     <div class="between"><b class="disp">СОФ БОЙЛИК</b><b class="num disp" style="font-size:20px;color:${assets-liab>=0?'var(--teal)':'var(--clay)'}">${fmt(assets-liab)}</b></div>
   </div>
   <div class="card"><div class="eyebrow">Захира фонди</div>
-    <div class="between sm" style="padding:6px 0"><span>Ойлик ўртача харажат</span><b class="num">${fmt(avg)}</b></div>
+    <div class="between sm" style="padding:6px 0"><span>Ойлик эҳтиёж (йиллик ÷12 билан)</span><b class="num">${fmt(avg)}</b></div>
     <div class="between sm" style="padding:6px 0"><span>Неча ойлик захира керак</span>
       <input class="plan-in num" style="width:70px" value="${n.months||6}" onchange="nwSet('months',this.value)"></div>
     <div class="between sm" style="padding:6px 0"><span>Керакли захира</span><b class="num">${fmt(need)}</b></div>
@@ -1109,7 +1234,7 @@ function renderNW(){
 /* ---------- Созламалар ---------- */
 function renderSet(){
   const catRow=(list,key)=>list.map((c,i)=>`<div class="between" style="padding:6px 0;border-bottom:1px solid var(--line)">
-      <span class="sm">${esc(c)}</span>
+      <span class="sm">${esc(c)}${key==='catEx'&&isYrCat(c)?'<span class="yrtag">йиллик</span>':''}</span>
       <span><button class="btn sm ghost" onclick="renameCat('${key}',${i})">Номи</button>
       <button class="btn sm warn" onclick="delCat('${key}',${i})">×</button></span></div>`).join('');
   const memRow=S.members.map((m,i)=>`<div class="between" style="padding:6px 0;border-bottom:1px solid var(--line)">
@@ -1119,6 +1244,9 @@ function renderSet(){
   el('setBody').innerHTML=`
   <div class="card"><div class="eyebrow">Харажат категориялари</div>${catRow(S.catEx,'catEx')}
     <button class="btn ghost sm" style="margin-top:10px;width:100%" onclick="addCat('catEx')">+ Категория қўшиш</button></div>
+  <div class="card"><div class="eyebrow">Йиллик харажат категориялари</div>
+    <div class="sm muted" style="margin-bottom:10px">Белгиланган категория танланганда ёзув ўзи «Йиллик» бўлиб туради. Бу эски ёзувларни ўзгартирмайди.</div>
+    <div class="chips">${S.catEx.map((c,i)=>`<button class="${isYrCat(c)?'on':''}" onclick="toggleCatYr(${i})">${esc(c)}</button>`).join('')}</div></div>
   <div class="card"><div class="eyebrow">Даромад категориялари</div>${catRow(S.catIn,'catIn')}
     <button class="btn ghost sm" style="margin-top:10px;width:100%" onclick="addCat('catIn')">+ Категория қўшиш</button></div>
   <div class="card"><div class="eyebrow">Оила аъзолари</div>${memRow}
@@ -1146,6 +1274,8 @@ function renderSet(){
       <b>Қарз олиш — даромад эмас, қарз бериш — харажат эмас.</b> Улар «Ёзув → Ўтказма · Қарз» бўлимидан киритилади, иккита ёзув ўзи ясалади.<br><br>
       <b>Насияга олдим:</b> оддий «Харажат» ёзинг, лекин ҳисоб қилиб насия ҳисобини танланг — пул чиқмайди, қарз ортади.<br><br>
       <b>Насияни тўладим:</b> «Ўтказма · Қарз → Насияни тўладим». Бу харажат эмас — харажат моли олинган куни ёзилган.<br><br>
+      <b>Йиллик харажат</b> — йилда бир марта бўладиган тўлов (суғурта, контракт, закот, қурбонлик). Ёзишда «Харажат тури → Йиллик» ни танланг. У ойлик назоратга кирмайди, «Ҳисобот → Йил» да ойига 1/12 улуши кўрсатилади.<br>
+      Эски ёзувни йиллик қилиш: ёзувни босинг → «Йиллик харажат деб белгилаш».<br><br>
       <b>Фоиз</b> — ҳақиқий харажат. «Қарз/кредит фоизи» категорияси билан оддий харажат қилиб ёзинг.<br><br>
       <b>Бизнес пулини</b> бу дафтарга киритманг. Ўзингизга берган ойлигингизни «Бизнесдан ойлик» даромади қилиб ёзинг.
     </div></div>`;
@@ -1154,9 +1284,15 @@ function addCat(k){promptSheet('Янги категория','',v=>{if(!v)return
 function renameCat(k,i){const old=S[k][i];promptSheet('Категория номи',old,v=>{if(!v)return;
   S.txns.forEach(t=>{if(t.cat===old)t.cat=v});
   Object.values(S.plan).forEach(p=>{if(p[old]!=null){p[v]=p[old];delete p[old]}});
+  if(k==='catEx'){const j=S.catYr.indexOf(old);if(j>=0)S.catYr[j]=v}
   S[k][i]=v;save();render()})}
 function delCat(k,i){const c=S[k][i];const n=S.txns.filter(t=>t.cat===c).length;
-  if(n){toast('«'+c+'» да '+n+' та ёзув бор');return} S[k].splice(i,1);save();render();toast('Ўчирилди')}
+  if(n){toast('«'+c+'» да '+n+' та ёзув бор');return} S[k].splice(i,1);
+  if(k==='catEx')S.catYr=S.catYr.filter(x=>x!==c);
+  save();render();toast('Ўчирилди')}
+function toggleCatYr(i){const c=S.catEx[i];if(!c)return;
+  if(isYrCat(c))S.catYr=S.catYr.filter(x=>x!==c); else S.catYr.push(c);
+  save();render()}
 function addMem(){promptSheet('Янги аъзо','',v=>{if(!v)return;S.members.push(v);save();render()})}
 function renameMem(i){const old=S.members[i];promptSheet('Аъзо номи',old,v=>{if(!v)return;
   S.txns.forEach(t=>{if(t.member===old)t.member=v});S.members[i]=v;save();render()})}
@@ -1182,9 +1318,9 @@ function download(name,text,type){
 }
 function exportJSON(){download('hamyon-'+today()+'.json',JSON.stringify(S,null,1));toast('Захира юкланди')}
 function exportCSV(){
-  const h=['Сана','Тури','Категория','Ким учун','Тавсиф','Ҳисоб','Валюта','Сумма','Курс','Сўмда'];
+  const h=['Сана','Тури','Харажат тури','Категория','Ким учун','Тавсиф','Ҳисоб','Валюта','Сумма','Курс','Сўмда'];
   const rows=S.txns.slice().sort((a,b)=>a.date<b.date?-1:1).map(t=>{const a=acc(t.acc)||{};
-    return [t.date,t.type,t.cat,t.member,t.desc,a.name,a.cur,t.amount,(t.rate!=null?t.rate:accRate(a)),Math.round(txnUZS(t))]
+    return [t.date,t.type,t.type===EXP?(t.yr?'Йиллик':'Ойлик'):'',t.cat,t.member,t.desc,a.name,a.cur,t.amount,(t.rate!=null?t.rate:accRate(a)),Math.round(txnUZS(t))]
       .map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(';')});
   download('hamyon-'+today()+'.csv',[h.join(';'),...rows].join('\n'),'text/csv');
   toast('CSV юкланди');
@@ -1194,7 +1330,7 @@ function importJSON(){
   i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();
     r.onload=()=>{try{const d=JSON.parse(String(r.result).replace(/^\ufeff/,''));if(!d.accounts||!d.txns)throw 0;
       S=d;if(!S.ui)S.ui={month:ym(new Date()),rep:'month',year:new Date().getFullYear()};
-      doSave();render();toast('Тикланди: '+S.txns.length+' та ёзув')}catch(e){toast('Файл нотўғри')}};
+      migrate();doSave();render();toast('Тикланди: '+S.txns.length+' та ёзув')}catch(e){toast('Файл нотўғри')}};
     r.readAsText(f)};
   i.click();
 }
